@@ -1,0 +1,2 @@
+print hello
+add 2 2
