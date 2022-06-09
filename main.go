@@ -10,6 +10,10 @@ import (
 	"sync"
 )
 
+const AmbiguousArgsNumberError string = "SYNTAX ERROR: number of arguments is ambiguous"
+const NotNumberError string = "SYNTAX ERROR: '%v' is not a number"
+const UnknownCommandError string = "SYNTAX ERROR: unknown command '%v'"
+
 // MARK: - commandsQueue
 
 type commandsQueue struct {
@@ -125,15 +129,29 @@ func (add *addCommand) Execute(handler Handler) {
 func parse(line string) Command {
 	parts := strings.Fields(line)
 	command, args := parts[0], parts[1:]
+
 	switch command {
 	case "print":
+		if len(args) != 1 {
+			return &printCommand{arg: AmbiguousArgsNumberError}
+		}
 		return &printCommand{arg: args[0]}
 	case "add":
-		arg1, _ := strconv.Atoi(args[0])
+		if len(args) != 2 {
+			return &printCommand{arg: AmbiguousArgsNumberError}
+		}
+		arg1, err := strconv.Atoi(args[0])
+		if err != nil {
+			return &printCommand{arg: fmt.Sprintf(NotNumberError, args[0])}
+		}
 		arg2, _ := strconv.Atoi(args[1])
+		if err != nil {
+			return &printCommand{arg: fmt.Sprintf(NotNumberError, args[1])}
+		}
 		return &addCommand{arg1, arg2}
 	}
-	return nil
+
+	return &printCommand{arg: fmt.Sprintf(UnknownCommandError, command)}
 }
 
 var inputPath = flag.String("f", "", "Path to file with instructions")
@@ -152,9 +170,8 @@ func main() {
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		commandLine := scanner.Text()
-		if cmd := parse(commandLine); cmd != nil {
-			eventLoop.Post(cmd)
-		}
+		cmd := parse(commandLine)
+		eventLoop.Post(cmd)
 	}
 	input.Close()
 	eventLoop.AwaitFinish()
